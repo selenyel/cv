@@ -1,8 +1,9 @@
-# SELEN YEL
+# ![Logo](/images/logo.png) SELEN YEL
 *A web site for me and those who wants to see my lesson documents*
 
-For site:
+* For site:
 https://selenyel.github.io/cv/
 
-For files:
+* For files:
 https://github.com/selenyel/cv
+
