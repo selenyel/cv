@@ -1,4 +1,4 @@
-# ![Logo](/images/logo.png) SELEN YEL
+# ![Logo](/images/SmallLogo.png) SELEN YEL
 *A web site for me and those who wants to see my lesson documents*
 
 * For site:
