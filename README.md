@@ -1,5 +1,8 @@
-A web site for me and those who wants to see my public documents
+# SELEN YEL
+*A web site for me and those who wants to see my lesson documents*
+
 For site:
 https://selenyel.github.io/cv/
+
 For files:
 https://github.com/selenyel/cv
