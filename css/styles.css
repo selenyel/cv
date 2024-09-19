@@ -1,0 +1,98 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f4;
+    color: #333;
+    position: relative;
+}
+
+header {
+    position: relative;
+    background-color: #4CAF50;
+    color: white;
+    text-align: center;
+    padding: 2em 0;
+    overflow: hidden;
+}
+
+.header-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #005234;
+    background-image: url("https://www.transparenttextures.com/patterns/foggy-birds.png");
+    background-size: 250px 250px;
+    z-index: 2;
+    opacity: 0.3;
+}
+
+
+
+header h1 {
+    position: relative;
+    z-index: 3;
+    margin: 0;
+    font-size: 2.5em;
+}
+
+header p {
+    margin: 0;
+    font-size: 1.2em;
+}
+
+section {
+    padding: 2em;
+    margin: 0 auto;
+    max-width: 800px;
+    position: relative;
+}
+
+section:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #f4f4f4 25%, transparent 25%, transparent 75%, #f4f4f4 75%, #f4f4f4), linear-gradient(225deg, #f4f4f4 25%, transparent 25%, transparent 75%, #f4f4f4 75%, #f4f4f4);
+    background-size: 50px 50px;
+    opacity: 0.1;
+    z-index: -1;
+}
+
+section h2 {
+    border-bottom: 2px solid #4CAF50;
+    padding-bottom: 0.5em;
+    margin-bottom: 1em;
+    font-size: 1.8em;
+}
+
+ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+ul li {
+    background-color: #1273255c;
+    background-image: url(https://www.transparenttextures.com/patterns/subtle-grey.png);
+    margin: 0.5em 0;
+    padding: 0.5em;
+    border-radius: 5px;
+    color: #000000;
+    font-size: larger;
+    font-weight: bold;
+}
+
+footer {
+    color: white;
+    text-align: center;
+    padding: 1em 0;
+    bottom: 0;
+    width: 100%;
+    background-color: #369448;
+    background-image: url("https://www.transparenttextures.com/patterns/foggy-birds.png");
+    background-size: 250px 250px;
+}
