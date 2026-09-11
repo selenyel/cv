@@ -211,35 +211,9 @@ html[data-theme="contrast"] .canvas-art{display:none}
 }
 .tick:hover::after,.tick:focus-visible::after{opacity:1;transform:translateY(-50%) translateX(0)}
 @media (max-width:860px){.tick::after{display:none}}
-.face{
-  display:block;width:40px;height:40px;cursor:default;
-  color:var(--graphite-2);
-  transition:color .25s ease;
-}
-.face svg{display:block;width:100%;height:100%;overflow:visible}
-.face svg *{
-  fill:none;stroke:currentColor;
-  stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;
-  vector-effect:non-scaling-stroke;
-}
-.face .pupil{stroke-width:2.8}
-.pupil{transform-box:view-box;transition:opacity .12s ease}
-.wink{opacity:0;transition:opacity .12s ease}
-/* the tongue draws itself out rather than popping in */
-.tongue{
-  opacity:0;stroke-dasharray:1;stroke-dashoffset:1;
-  transition:stroke-dashoffset .26s cubic-bezier(.3,.8,.3,1),opacity .1s linear;
-}
-.face:hover,.face.poke{color:var(--ink)}
-.face:hover .pupil-l,.face.poke .pupil-l{opacity:0}
-.face:hover .wink,.face.poke .wink{opacity:1}
-.face:hover .tongue,.face.poke .tongue{opacity:1;stroke-dashoffset:0}
-
-@media (prefers-reduced-motion:reduce){
-  .tongue{transition:none}
-}
-@media (max-width:860px){
-  .face{width:32px;height:32px}
+.rail-count{
+  font-family:"JetBrains Mono",monospace;font-size:.7rem;color:var(--ink);
+  writing-mode:vertical-rl;letter-spacing:.1em;
 }
 
 @media (max-width:860px){
@@ -251,6 +225,7 @@ html[data-theme="contrast"] .canvas-art{display:none}
   .rail-mark{display:none}
   .rail-meter{flex-direction:row;gap:2px}
   .tick{width:44px;height:44px}
+  .rail-count{writing-mode:horizontal-tb}
   :root{--rail:0px}
   body{padding-bottom:52px}
 }
@@ -587,16 +562,7 @@ body.canvas-complete .complete-note{opacity:1;transform:none}
     <li><a class="tick" href="#experience" data-sec="experience" data-label="Experience"><i class="bead" aria-hidden="true"></i><span class="vh">Experience</span></a></li>
     <li><a class="tick" href="#contact"    data-sec="contact"    data-label="Education"><i class="bead" aria-hidden="true"></i><span class="vh">Education</span></a></li>
   </ul>
-  <span class="face" id="face" aria-hidden="true">
-    <svg viewBox="0 0 40 40" role="presentation" focusable="false">
-      <circle class="head" cx="20" cy="20" r="17"/>
-      <path class="pupil pupil-l" d="M14 16.5 l0.01 0"/>
-      <path class="pupil pupil-r" d="M26 16.5 l0.01 0"/>
-      <path class="wink" d="M12 17.4 Q14 14.9 16 17.4"/>
-      <path class="mouth" d="M12.5 24.2 Q20 30.4 27.5 24.2"/>
-      <path class="tongue" pathLength="1" d="M17.6 27 C17.6 32.2 22.4 32.2 22.4 27"/>
-    </svg>
-  </span>
+  <span class="rail-count" aria-hidden="true"><span id="railCount">0</span>/4</span>
   <span class="vh" role="status" aria-live="polite" id="railStatus"></span>
 </nav>
 
@@ -628,7 +594,10 @@ body.canvas-complete .complete-note{opacity:1;transform:none}
           <button type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
           <button type="button" data-theme-set="contrast" aria-pressed="false">High contrast</button>
         </div>
-        <span class="spec" id="themeHint">Guides are decorative, so they sit near the paper. High contrast promotes them to real lines.</span>
+        <span class="spec" id="themeHint">
+          <!-- Guides are decorative, so they sit near the paper. High contrast promotes them to real lines. -->
+           Last update : <b>Fri Sep 11 2026</b>
+        </span>
       </div>
     </div>
   </header>
@@ -839,7 +808,7 @@ body.canvas-complete .complete-note{opacity:1;transform:none}
         <div>
           <h3><span class="dot" style="background:var(--sand)"></span>Design</h3>
           <ul>
-            <li>Figma</li><li>Design systems</li><li>Interaction design</li>
+            <li>Figma</li><li>AdobeXD</li><li>Design systems</li><li>Interaction design</li>
             <li>Accessibility</li><li>Icon design</li><li>Prototyping</li><li>Canva</li>
           </ul>
         </div>
@@ -870,7 +839,7 @@ body.canvas-complete .complete-note{opacity:1;transform:none}
       </div>
 
       <div class="role">
-        <span class="spec">Add dates</span>
+        <span class="spec">Sep 2025</span>
         <div>
           <h3>UI/UX Designer &amp; Front-end Developer</h3>
           <p class="org">OneWell</p>
@@ -884,7 +853,7 @@ body.canvas-complete .complete-note{opacity:1;transform:none}
       </div>
 
       <div class="role">
-        <span class="spec">Add dates</span>
+        <span class="spec">Nov 2022 - Jul 2025 </span>
         <div>
           <h3>Lead Front-end Developer</h3>
           <p class="org">ESBIS Reklam Kurulu and Tüketici Portal</p>
@@ -896,17 +865,33 @@ body.canvas-complete .complete-note{opacity:1;transform:none}
       </div>
 
       <div class="role">
-        <span class="spec">Add dates</span>
+        <span class="spec">Jan - Mar 2020</span>
         <div>
-          <h3>Full stack, then browser performance and security</h3>
-          <p class="org">Earlier work</p>
+          <h3>Front-end Intern</h3>
+          <p class="org">Bisoft</p>
           <p>
-            Started full stack, then specialised in browser-level optimisation and web security
-            before moving to front-end and then into design. The move was about the questions I
-            kept asking, which were about people rather than architecture.
+            Built React pages that rendered different metric types depending on the data
+            behind them, including seismic readings where depth and magnitude had to stay
+            comparable at a glance. Most of the work went into graphs and tables holding
+            their shape across screen sizes.
           </p>
         </div>
       </div>
+
+      <div class="role">
+        <span class="spec">May - Aug 2017 &amp; Jan - Apr 2018</span>
+        <div>
+          <h3>Front-end Intern</h3>
+          <p class="org">LOGO Yazilim</p>
+          <p>
+            Built Angular pages from designs handed to me, one component at a time, which
+            is where I first saw a design from the build side. Also wrote the Ant script
+            behind the release pipeline: run the test suite, check coverage, publish a new
+            version only when it passed. The test cases were mine too.
+          </p>
+  </div>
+      </div>
+
     </div>
   </section>
 
@@ -914,11 +899,11 @@ body.canvas-complete .complete-note{opacity:1;transform:none}
   <section id="contact">
     <div class="wrap">
       <div class="section-head">
-        <h2>Education and elsewhere</h2>
+        <h2>Education</h2>
       </div>
       <p class="lede">
         Computer Engineering, TOBB University of Economics and Technology.
-        Certified in cybersecurity, and a persistent reader of documentation.
+        <!-- Certified in cybersecurity, and a persistent reader of documentation. -->
       </p>
       <div class="links">
         <a class="link" href="https://www.linkedin.com/in/selenyeltemellioglu/">LinkedIn</a>
@@ -933,7 +918,6 @@ body.canvas-complete .complete-note{opacity:1;transform:none}
   <div class="wrap">
     <footer>
       <span>© <span id="yr">2026</span> Selen Yel Temellioglu</span>
-      <span class="complete-note">Canvas complete. Every state accounted for.</span>
     </footer>
   </div>
 
@@ -961,6 +945,7 @@ body.canvas-complete .complete-note{opacity:1;transform:none}
     done[sec] = true;
     if(tickFor[sec]) tickFor[sec].classList.add('done');
     var n = Object.keys(done).length;
+    document.getElementById('railCount').textContent = n;
     if(n >= TOTAL) document.body.classList.add('canvas-complete');
   }
 
@@ -1007,55 +992,6 @@ body.canvas-complete .complete-note{opacity:1;transform:none}
   window.addEventListener('scroll', onScroll, { passive:true });
   window.addEventListener('load', function(){ measure(); spy(); });
   measure(); spy();
-
-  /* ---------- the face ---------- */
-  var face = document.getElementById('face');
-  if(face){
-    var pupils = face.querySelectorAll('.pupil');
-    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
-
-    /* the rail is fixed, so the face only moves when the window resizes.
-       Cache its centre and keep the pointer handler to pure arithmetic. */
-    var fx = 0, fy = 0;
-    function locate(){
-      var r = face.getBoundingClientRect();
-      fx = r.left + r.width / 2;
-      fy = r.top + r.height / 2;
-    }
-    locate();
-    window.addEventListener('resize', locate);
-
-    var px = 0, py = 0, pending = false;
-    var REACH = 2.3; /* svg user units the pupils may travel */
-
-    function look(){
-      pending = false;
-      var dx = px - fx, dy = py - fy;
-      var d = Math.sqrt(dx * dx + dy * dy);
-      if(d < 1) return;
-      /* settle down when the pointer is right on top of it */
-      var k = Math.min(1, d / 36) * REACH / d;
-      var ox = (dx * k).toFixed(2), oy = (dy * k).toFixed(2);
-      for(var i = 0; i < pupils.length; i++){
-        pupils[i].style.transform = 'translate(' + ox + 'px,' + oy + 'px)';
-      }
-    }
-
-    if(!reduce.matches){
-      window.addEventListener('mousemove', function(e){
-        px = e.clientX; py = e.clientY;
-        if(!pending){ pending = true; window.requestAnimationFrame(look); }
-      }, { passive:true });
-    }
-
-    /* touch has no hover, so a tap gets the same wink */
-    var pokeTimer;
-    face.addEventListener('click', function(){
-      face.classList.add('poke');
-      window.clearTimeout(pokeTimer);
-      pokeTimer = window.setTimeout(function(){ face.classList.remove('poke'); }, 1400);
-    });
-  }
 
   /* ---------- theme ---------- */
   /* one portrait per theme, fetched only when that theme is chosen */
