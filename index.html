@@ -148,6 +148,7 @@ body.canvas-complete .canvas-grid{opacity:.12}
 .canvas-art{
   position:absolute;top:-4%;left:-8%;width:min(1100px,92%);
   opacity:.5;pointer-events:none;z-index:0;
+  transition:opacity .5s ease,filter .5s ease;
 }
 html[data-theme="dark"] .canvas-art{opacity:.05;filter:invert(1)}
 html[data-theme="contrast"] .canvas-art{display:none}
@@ -299,6 +300,7 @@ section{padding-block:var(--gap-section)}
 .portrait{
   width:clamp(150px,19vw,272px);height:auto;display:block;
   filter:saturate(1.02);border-radius:50%;
+  transition:box-shadow .42s ease,filter .42s ease;
 }
 html[data-theme="contrast"] .portrait{box-shadow:0 0 0 2px var(--ink);filter:none}
 @media (max-width:820px){
@@ -573,6 +575,33 @@ body.canvas-complete .complete-note{opacity:1;transform:none}
   .rail{padding:0 .5rem;gap:.5rem}
   .tick{width:36px;height:36px}
   .face{width:26px;height:26px}
+}
+
+/* ============================================================
+   THEME TRANSITION
+   ============================================================ */
+/* modern path: the browser crossfades a snapshot of the whole page, which
+   also covers things CSS cannot tween — dashed becoming solid, radii,
+   border widths, the portrait swapping out */
+::view-transition-old(root),
+::view-transition-new(root){
+  animation-duration:.42s;
+  animation-timing-function:cubic-bezier(.4,0,.2,1);
+}
+/* fallback: only while .theming is on the root, and only paint properties */
+html.theming *,
+html.theming *::before,
+html.theming *::after{
+  transition:background-color .42s ease,border-color .42s ease,
+             color .42s ease,fill .42s ease,stroke .42s ease,
+             box-shadow .42s ease,opacity .42s ease !important;
+  transition-delay:0s !important;
+}
+@media (prefers-reduced-motion:reduce){
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*){animation:none !important}
+  html.theming *,html.theming *::before,html.theming *::after{transition:none !important}
 }
 </style>
 </head>
@@ -1090,17 +1119,64 @@ body.canvas-complete .complete-note{opacity:1;transform:none}
   };
   var portrait = document.getElementById('portrait');
   var themeBtns = document.querySelectorAll('[data-theme-set]');
+  var motionOK = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function applyTheme(t, btn){
+    document.documentElement.setAttribute('data-theme', t);
+    if(PORTRAIT[t] && portrait) portrait.src = PORTRAIT[t];
+    Array.prototype.forEach.call(themeBtns, function(b){
+      b.setAttribute('aria-pressed', String(b === btn));
+    });
+  }
+
+  /* fallback for browsers without View Transitions: tint every element
+     for the length of the swap, then take the rule back off so it never
+     interferes with hover */
+  var themingTimer;
+  function crossfade(t, btn){
+    var root = document.documentElement;
+    root.classList.add('theming');
+    applyTheme(t, btn);
+    window.clearTimeout(themingTimer);
+    themingTimer = window.setTimeout(function(){ root.classList.remove('theming'); }, 480);
+  }
+
+  function setTheme(t, btn){
+    if(!motionOK){ applyTheme(t, btn); return; }
+
+    /* decode the incoming portrait before the fade starts, otherwise it
+       pops in a beat late and gives the whole transition away */
+    var fired = false;
+    function go(){
+      if(fired) return;
+      fired = true;
+      if(document.startViewTransition){
+        document.startViewTransition(function(){ applyTheme(t, btn); });
+      } else {
+        crossfade(t, btn);
+      }
+    }
+    var pre = new Image();
+    pre.onload = go;
+    pre.onerror = go;
+    pre.src = PORTRAIT[t];
+    if(pre.complete) go();
+    window.setTimeout(go, 220); /* a slow image never holds up the switch */
+  }
+
   Array.prototype.forEach.call(themeBtns, function(btn){
     btn.addEventListener('click', function(){
-      var t = btn.getAttribute('data-theme-set');
-      document.documentElement.setAttribute('data-theme', t);
-      if(PORTRAIT[t] && portrait) portrait.src = PORTRAIT[t];
-      Array.prototype.forEach.call(themeBtns, function(b){
-        b.setAttribute('aria-pressed', String(b === btn));
-      });
+      setTheme(btn.getAttribute('data-theme-set'), btn);
       complete('top');
     });
   });
+
+  /* fade text that gets replaced in place, rather than swapping it hard */
+  function reveal(el){
+    if(el && motionOK && el.animate){
+      el.animate([{opacity:0},{opacity:1}], { duration:220, easing:'ease-out' });
+    }
+  }
 
   /* ---------- shift simulator ---------- */
   var DIMS = { watch:'watch · 186×232', phone:'phone · 232×400', web:'web · 420×288' };
@@ -1255,6 +1331,7 @@ body.canvas-complete .complete-note{opacity:1;transform:none}
       reqMark.hidden = !spec.req;
       msgEl.textContent = spec.msg;
       valEl.textContent = spec.val;
+      reveal(valEl); reveal(msgEl);
       document.getElementById('sp-state').textContent = s;
       document.getElementById('sp-border').textContent = spec.border;
       document.getElementById('sp-a11y').textContent = spec.a11y;
