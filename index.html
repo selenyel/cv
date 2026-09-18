@@ -315,7 +315,19 @@ html[data-theme="contrast"] .portrait{box-shadow:0 0 0 2px var(--ink);filter:non
   padding-top:1.4rem;border-top:var(--guide-w) var(--guide-style) var(--guide);
   max-width:var(--measure);
 }
-.seg{display:inline-flex;border:var(--guide-w) solid var(--guide);border-radius:999px;padding:4px;gap:2px;background:var(--paper-2)}
+.seg{position:relative;display:inline-flex;border:var(--guide-w) solid var(--guide);border-radius:999px;padding:4px;gap:2px;background:var(--paper-2)}
+/* one pill that slides between segments, rather than three that blink */
+.seg-thumb{
+  position:absolute;top:4px;left:0;height:calc(100% - 8px);width:0;
+  border-radius:999px;background:var(--ink);pointer-events:none;
+  transform:translateX(0);
+  transition:transform .34s cubic-bezier(.33,1.05,.4,1),
+             width .34s cubic-bezier(.33,1.05,.4,1);
+}
+/* the appearance control sits inside a view transition, so the thumb gets
+   its own name and the browser morphs it instead of dissolving it */
+.lab .seg-thumb{view-transition-name:appearance-thumb}
+@media (prefers-reduced-motion:reduce){ .seg-thumb{transition:none} }
 html[data-theme="contrast"] .seg{border-color:var(--ink)}
 .seg button{
   font:inherit;font-size:var(--step--1);font-weight:500;
@@ -323,8 +335,11 @@ html[data-theme="contrast"] .seg{border-color:var(--ink)}
   padding:.42rem 1rem;border-radius:999px;cursor:pointer;
   transition:background .2s ease,color .2s ease;
 }
+.seg button{position:relative;z-index:1}
 .seg button:hover{color:var(--ink)}
+/* no JS means no thumb, so the plain pill stays as the fallback */
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.seg.has-thumb button[aria-pressed="true"]{background:transparent}
 
 /* ============================================================
    SHIFT SIMULATOR  — the one bold element
@@ -411,7 +426,7 @@ html[data-theme="contrast"] .task.is-done{background:var(--sage);color:#fff}
 .density{
   margin:1rem .2rem 0;color:var(--graphite);font-size:var(--step--1);line-height:1.6;max-width:46ch;
 }
-.readout{display:flex;flex-direction:column;gap:1.6rem}
+.readout{display:flex;flex-direction:column;gap:1.6rem;align-items:flex-start}
 .counter{
   display:flex;align-items:baseline;gap:.7rem;
   border-bottom:var(--guide-w) var(--guide-style) var(--guide);padding-bottom:1.2rem;
@@ -505,8 +520,10 @@ html[data-theme="dark"] .req{color:var(--sand)}
 .state-list button{
   font:inherit;font-size:var(--step--1);cursor:pointer;
   background:transparent;border:var(--guide-w) solid var(--guide);color:var(--graphite);
-  border-radius:999px;padding:.35rem .85rem;transition:all .18s ease;
+  border-radius:999px;padding:.35rem .85rem;
+  transition:background-color .2s ease,color .2s ease,border-color .2s ease,transform .12s ease;
 }
+.state-list button:active{transform:scale(.96)}
 .state-list button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 
 .spec-table{width:100%;border-collapse:collapse;margin-top:1.4rem}
@@ -1110,6 +1127,45 @@ html.theming *::after{
     });
   }
 
+  /* ---------- segmented controls ---------- */
+  /* the thumb is injected rather than authored, so with JS off the markup
+     still renders the plain pressed pill */
+  var segs = Array.prototype.slice.call(document.querySelectorAll('.seg'));
+  segs.forEach(function(seg){
+    var t = document.createElement('span');
+    t.className = 'seg-thumb';
+    t.setAttribute('aria-hidden','true');
+    seg.insertBefore(t, seg.firstChild);
+    seg.classList.add('has-thumb');
+  });
+
+  function fitThumb(seg, animate){
+    if(!seg) return;
+    var thumb = seg.querySelector('.seg-thumb');
+    var on = seg.querySelector('[aria-pressed="true"]');
+    if(!thumb || !on) return;
+    if(animate === false) thumb.style.transition = 'none';
+    var sr = seg.getBoundingClientRect();
+    var br = on.getBoundingClientRect();
+    var bl = parseFloat(getComputedStyle(seg).borderLeftWidth) || 0;
+    thumb.style.width = br.width + 'px';
+    thumb.style.transform = 'translateX(' + (br.left - sr.left - bl) + 'px)';
+    if(animate === false){
+      thumb.offsetWidth;          /* flush, so the next move animates */
+      thumb.style.transition = '';
+    }
+  }
+  function fitAllThumbs(animate){
+    segs.forEach(function(seg){ fitThumb(seg, animate); });
+  }
+
+  fitAllThumbs(false);
+  /* button widths shift once the webfonts land, so measure again then */
+  if(document.fonts && document.fonts.ready){
+    document.fonts.ready.then(function(){ fitAllThumbs(false); });
+  }
+  window.addEventListener('resize', function(){ fitAllThumbs(false); });
+
   /* ---------- theme ---------- */
   /* one portrait per theme, fetched only when that theme is chosen */
   var PORTRAIT = {
@@ -1127,6 +1183,7 @@ html.theming *::after{
     Array.prototype.forEach.call(themeBtns, function(b){
       b.setAttribute('aria-pressed', String(b === btn));
     });
+    fitThumb(btn.parentNode);
   }
 
   /* fallback for browsers without View Transitions: tint every element
@@ -1285,6 +1342,7 @@ html.theming *::after{
       Array.prototype.forEach.call(document.querySelectorAll('[data-device-set]'), function(b){
         b.setAttribute('aria-pressed', String(b === btn));
       });
+      fitThumb(btn.parentNode);
       complete('flow');
     });
   });
