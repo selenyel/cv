@@ -620,6 +620,25 @@ html.theming *::after{
   ::view-transition-new(*){animation:none !important}
   html.theming *,html.theming *::before,html.theming *::after{transition:none !important}
 }
+
+/* ============================================================
+   THREE.JS LAYERS  — progressive enhancement; the page works without them
+   ============================================================ */
+.hero-gl{
+  position:absolute;inset:0;width:100%;height:100%;
+  z-index:1;pointer-events:none;
+  opacity:0;transition:opacity .8s ease;
+}
+.hero.gl-on .hero-gl{opacity:1}
+/* once the live scene is running, the static sketch steps aside */
+.hero.gl-on .canvas-art{opacity:0 !important}
+.stage-gl{
+  position:absolute;inset:0;width:100%;height:100%;
+  z-index:0;pointer-events:none;
+  opacity:0;transition:opacity .6s ease;
+}
+.stage.gl-on .stage-gl{opacity:1}
+.stage .device{z-index:1;will-change:transform}
 </style>
 </head>
 
@@ -659,6 +678,7 @@ html.theming *::after{
   <!-- ===================== HERO ===================== -->
   <header class="hero" id="top">
     <img class="canvas-art" src="bg-canvas.webp" alt="" aria-hidden="true">
+    <canvas class="hero-gl" id="heroGL" aria-hidden="true"></canvas>
     <div class="wrap hero-inner">
       <div class="hero-layout">
         <div>
@@ -704,6 +724,7 @@ html.theming *::after{
       <div class="sim">
         <div>
           <div class="stage" id="stage" data-dim="watch · 186×232">
+            <canvas class="stage-gl" id="stageGL" aria-hidden="true"></canvas>
             <div class="device" data-device="watch" id="device">
               <div class="device-screen" id="screen"></div>
             </div>
@@ -1335,6 +1356,7 @@ html.theming *::after{
     btn.addEventListener('click', function(){
       var d = btn.getAttribute('data-device-set');
       device.setAttribute('data-device', d);
+      document.dispatchEvent(new CustomEvent('devicechange', { detail:d }));
       stage.setAttribute('data-dim', DIMS[d]);
       document.getElementById('densityNote').textContent = DENSITY[d];
       selected = null; logged = false; setTaps(0);
@@ -1414,6 +1436,289 @@ html.theming *::after{
       measure(); current = null; spy();
     }, 120);
   });
+})();
+</script>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+</script>
+<script type="module">
+/* Optional 3D layer. If three.js fails to load or WebGL is missing, this
+   script exits quietly and the static page is unchanged. */
+import * as THREE from 'three';
+
+const root   = document.documentElement;
+const motion = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const css    = n => getComputedStyle(root).getPropertyValue(n).trim();
+const col    = n => new THREE.Color(css(n));
+const theme  = () => root.getAttribute('data-theme') || 'light';
+const dpr    = () => Math.min(window.devicePixelRatio || 1, 1.75);
+
+function makeRenderer(canvas){
+  try{
+    const r = new THREE.WebGLRenderer({ canvas, alpha:true, antialias:true, powerPreference:'low-power' });
+    r.setClearColor(0x000000, 0);
+    return r;
+  }catch(e){ return null; }
+}
+
+/* the scenes share one loop, and a scene only renders while on screen */
+const scenes = [];
+let raf = 0, last = 0;
+function kick(){ if(!raf) raf = requestAnimationFrame(frame); }
+function frame(now){
+  raf = 0;
+  const dt = Math.min((now - last) / 1000 || .016, .05);
+  last = now;
+  let again = false;
+  for(const s of scenes){
+    if(!s.visible) continue;
+    if(motion || s.dirty){ s.dirty = false; s.render(now / 1000, dt); }
+    if(motion) again = true;
+  }
+  if(again) raf = requestAnimationFrame(frame);
+}
+function register(s, el){
+  s.visible = false; s.dirty = true;
+  scenes.push(s);
+  new IntersectionObserver(es => {
+    s.visible = es[0].isIntersecting;
+    if(s.visible){ s.dirty = true; kick(); }
+  }).observe(el);
+  new ResizeObserver(() => { s.resize(); s.dirty = true; kick(); }).observe(el);
+}
+
+/* pointer, shared. Normalised to -1..1 over the window. */
+const ptr = { x:0, y:0, has:false };
+window.addEventListener('pointermove', e => {
+  ptr.x = (e.clientX / innerWidth) * 2 - 1;
+  ptr.y = (e.clientY / innerHeight) * 2 - 1;
+  ptr.has = true;
+}, { passive:true });
+
+/* ============================================================
+   HERO: a quiet wireframe floor with a few drifting solids
+   ============================================================ */
+(function hero(){
+  const canvas = document.getElementById('heroGL');
+  const host   = canvas && canvas.parentElement;
+  if(!canvas) return;
+  const renderer = makeRenderer(canvas);
+  if(!renderer) return;
+
+  const scene  = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(42, 1, .1, 60);
+  camera.position.set(0, 2.4, 9);
+  scene.fog = new THREE.Fog(0xffffff, 7, 26);
+
+  /* floor grid: one vertex lattice, drawn as lines, displaced every frame */
+  const NX = 64, NZ = 36, STEP = 1;
+  const pos = new Float32Array(NX * NZ * 3);
+  const idx = [];
+  for(let j = 0; j < NZ; j++) for(let i = 0; i < NX; i++){
+    const k = (j * NX + i) * 3;
+    pos[k] = (i - NX / 2) * STEP; pos[k+1] = 0; pos[k+2] = -j * STEP + 6;
+    if(i < NX - 1) idx.push(j * NX + i, j * NX + i + 1);
+    if(j < NZ - 1) idx.push(j * NX + i, (j + 1) * NX + i);
+  }
+  const gGeo = new THREE.BufferGeometry();
+  gGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  gGeo.setIndex(idx);
+  const gMat = new THREE.LineBasicMaterial({ transparent:true, opacity:.5 });
+  const floor = new THREE.LineSegments(gGeo, gMat);
+  floor.position.y = -1.6;
+  scene.add(floor);
+
+  /* three wireframe solids in the discipline colours */
+  const shapes = [
+    { geo:new THREE.IcosahedronGeometry(1.1, 0), v:'--sage', p:[-6.2, .3, -3],  s:[.12,.2] },
+    { geo:new THREE.OctahedronGeometry(1.3, 0),  v:'--sky',  p:[ 6.4, .9, -6],  s:[.18,-.14] },
+    { geo:new THREE.BoxGeometry(1.2,1.2,1.2),    v:'--sand', p:[ 2.0,-.6, -1],  s:[-.16,.22] }
+  ].map(o => {
+    const m = new THREE.LineBasicMaterial({ transparent:true, opacity:.7 });
+    const mesh = new THREE.LineSegments(new THREE.EdgesGeometry(o.geo), m);
+    mesh.position.set(...o.p);
+    mesh.userData = { base:o.p[1], spin:o.s, v:o.v };
+    scene.add(mesh);
+    return mesh;
+  });
+
+  /* theme: targets are read from the page's own tokens, so the scene
+     can never drift from the CSS */
+  const T = {
+    line:new THREE.Color(), paper:new THREE.Color(),
+    lineOp:.5, shapeOp:.7, shapeCols:shapes.map(() => new THREE.Color())
+  };
+  const cur = { op:.5, sop:.7 };
+  function readTheme(snap){
+    const t = theme();
+    T.line.copy(col(t === 'contrast' ? '--ink' : '--graphite-2'));
+    T.paper.copy(col('--paper'));
+    T.lineOp  = t === 'contrast' ? .28 : t === 'dark' ? .6 : .55;
+    T.shapeOp = t === 'contrast' ? 0   : t === 'dark' ? .55 : .75;
+    shapes.forEach((m,i) => T.shapeCols[i].copy(col(m.userData.v)));
+    if(snap || !motion){
+      gMat.color.copy(T.line); scene.fog.color.copy(T.paper);
+      shapes.forEach((m,i) => m.material.color.copy(T.shapeCols[i]));
+      cur.op = T.lineOp; cur.sop = T.shapeOp;
+      gMat.opacity = cur.op; shapes.forEach(m => m.material.opacity = cur.sop);
+    }
+    s.dirty = true; kick();
+  }
+  new MutationObserver(() => readTheme(false)).observe(root, { attributes:true, attributeFilter:['data-theme'] });
+
+  let cx = 0, cy = 0;
+  const s = {
+    resize(){
+      const w = host.clientWidth, h = host.clientHeight;
+      if(!w || !h) return;
+      renderer.setPixelRatio(dpr());
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      /* keep the horizon in the lower half whatever the hero's height */
+      camera.setViewOffset(w, h, 0, -h * .16, w, h);
+      camera.updateProjectionMatrix();
+    },
+    render(t, dt){
+      const k = 1 - Math.exp(-dt * 6);
+
+      /* ease colours toward the theme */
+      gMat.color.lerp(T.line, k); scene.fog.color.lerp(T.paper, k);
+      cur.op += (T.lineOp - cur.op) * k; cur.sop += (T.shapeOp - cur.sop) * k;
+      gMat.opacity = cur.op;
+      shapes.forEach((m,i) => { m.material.color.lerp(T.shapeCols[i], k); m.material.opacity = cur.sop; });
+
+      /* parallax */
+      const tx = ptr.has ? ptr.x : 0, ty = ptr.has ? ptr.y : 0;
+      cx += (tx - cx) * k; cy += (ty - cy) * k;
+      camera.position.x = cx * .8;
+      camera.position.y = 2.4 - cy * .35;
+      camera.lookAt(0, -.6, 0);
+
+      /* waves, plus a bump that follows the pointer along the floor */
+      const bx = tx * 9, bz = -2 + ty * 2;
+      for(let i = 0; i < NX * NZ; i++){
+        const k3 = i * 3, x = pos[k3], z = pos[k3+2];
+        const d2 = (x - bx) * (x - bx) + (z - bz) * (z - bz);
+        pos[k3+1] = Math.sin(x * .38 + t * .55) * .22
+                  + Math.sin(z * .52 - t * .45) * .18
+                  + Math.exp(-d2 * .08) * .55 * (ptr.has ? 1 : 0);
+      }
+      gGeo.attributes.position.needsUpdate = true;
+
+      shapes.forEach((m,i) => {
+        m.rotation.x = t * m.userData.spin[0];
+        m.rotation.y = t * m.userData.spin[1];
+        m.position.y = m.userData.base + Math.sin(t * .5 + i * 2) * .25;
+      });
+      renderer.render(scene, camera);
+    }
+  };
+
+  register(s, host);
+  s.resize(); readTheme(true);
+  s.render(0, .016);
+  host.classList.add('gl-on');
+})();
+
+/* ============================================================
+   SIMULATOR: a real slab behind the DOM screen. The screen stays
+   HTML, so it is still focusable and readable; the slab supplies
+   the depth, the bezel and the light.
+   ============================================================ */
+(function deviceStage(){
+  const canvas = document.getElementById('stageGL');
+  const stage  = document.getElementById('stage');
+  const device = document.getElementById('device');
+  if(!canvas || !device) return;
+  const renderer = makeRenderer(canvas);
+  if(!renderer) return;
+
+  const PERSP = 1100;          /* px, shared by CSS and the camera */
+  const BEZEL = 9, DEPTH = 16;
+  const scene  = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(30, 1, 10, 4000);
+  camera.position.set(0, 0, PERSP);
+
+  scene.add(new THREE.AmbientLight(0xffffff, .9));
+  const key    = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(-300, 400, 500); scene.add(key);
+  const accent = new THREE.DirectionalLight(0xffffff, 1.4); accent.position.set(400, -200, 300); scene.add(accent);
+
+  const bodyMat = new THREE.MeshStandardMaterial({ roughness:.38, metalness:.15 });
+  const group = new THREE.Group();
+  const body  = new THREE.Mesh(new THREE.BufferGeometry(), bodyMat);
+  group.add(body);
+  scene.add(group);
+
+  function slab(w, h, r){
+    r = Math.max(1, Math.min(r, w / 2, h / 2));
+    const x = -w / 2, y = -h / 2, sh = new THREE.Shape();
+    sh.moveTo(x + r, y);
+    sh.lineTo(x + w - r, y);     sh.absarc(x + w - r, y + r,     r, -Math.PI / 2, 0);
+    sh.lineTo(x + w, y + h - r); sh.absarc(x + w - r, y + h - r, r, 0, Math.PI / 2);
+    sh.lineTo(x + r, y + h);     sh.absarc(x + r,     y + h - r, r, Math.PI / 2, Math.PI);
+    sh.lineTo(x, y + r);         sh.absarc(x + r,     y + r,     r, Math.PI, Math.PI * 1.5);
+    const g = new THREE.ExtrudeGeometry(sh, { depth:DEPTH, bevelEnabled:true, bevelThickness:3, bevelSize:2, bevelSegments:2, curveSegments:10 });
+    g.computeBoundingBox();
+    g.translate(0, 0, -g.boundingBox.max.z - 1);   /* front face just behind the DOM screen */
+    return g;
+  }
+
+  /* theme -> bezel and light colours */
+  const BODY = { light:'#202A31', dark:'#3B4B56', contrast:'#000000' };
+  const ACC  = { watch:'--sand', phone:'--sky', web:'--sage' };
+  const tgt = { body:new THREE.Color(BODY.light), acc:new THREE.Color() };
+  function readTheme(snap){
+    tgt.body.set(BODY[theme()] || BODY.light);
+    tgt.acc.copy(col(ACC[device.getAttribute('data-device')] || '--sky'));
+    if(snap || !motion){ bodyMat.color.copy(tgt.body); accent.color.copy(tgt.acc); }
+    s.dirty = true; kick();
+  }
+  new MutationObserver(() => readTheme(false)).observe(root, { attributes:true, attributeFilter:['data-theme'] });
+  document.addEventListener('devicechange', () => readTheme(false));
+
+  let W = 0, H = 0, R = 0, rx = 0, ry = 0, w3 = 0, h3 = 0;
+  const s = {
+    resize(){
+      w3 = stage.clientWidth; h3 = stage.clientHeight;
+      if(!w3 || !h3) return;
+      renderer.setPixelRatio(dpr());
+      renderer.setSize(w3, h3, false);
+      camera.aspect = w3 / h3;
+      camera.fov = 2 * Math.atan((h3 / 2) / PERSP) * 180 / Math.PI;   /* 1 unit = 1 css px at the screen plane */
+      camera.updateProjectionMatrix();
+    },
+    render(t, dt){
+      const k = 1 - Math.exp(-dt * 6);
+      bodyMat.color.lerp(tgt.body, k); accent.color.lerp(tgt.acc, k);
+
+      /* follow the DOM device's live size, so the slab rides the CSS morph */
+      const dw = device.offsetWidth + BEZEL * 2, dh = device.offsetHeight + BEZEL * 2;
+      const rad = (parseFloat(getComputedStyle(device.firstElementChild).borderTopLeftRadius) || 20) + BEZEL * .6;
+      R += (rad - R) * (motion ? k : 1);
+      if(Math.abs(dw - W) > .4 || Math.abs(dh - H) > .4 || Math.abs(R - rad) > .15 || !W){
+        W = dw; H = dh;
+        body.geometry.dispose();
+        body.geometry = slab(W, H, R);
+      }
+
+      /* tilt toward the pointer, with a slow sway so it is alive without one */
+      const tx = ptr.has ? ptr.y * 7 : Math.sin(t * .5) * 3.5;
+      const ty = ptr.has ? ptr.x * 11 : Math.cos(t * .4) * 5;
+      rx += (tx - rx) * k; ry += (ty - ry) * k;
+      const m = motion ? 1 : 0;
+      group.rotation.x = -rx * m * Math.PI / 180;
+      group.rotation.y =  ry * m * Math.PI / 180;
+      device.style.transform = m ? `perspective(${PERSP}px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg)` : '';
+
+      key.position.x = -300 + ry * 18;
+      renderer.render(scene, camera);
+    }
+  };
+
+  register(s, stage);
+  s.resize(); readTheme(true);
+  stage.classList.add('gl-on');
 })();
 </script>
 </body>
